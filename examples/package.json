@@ -1,0 +1,14 @@
+{
+  "name": "@codegenome-x/examples",
+  "version": "1.0.0",
+  "description": "Examples for CodeGenome X",
+  "private": true,
+  "scripts": {
+    "analyze": "codegenome analyze",
+    "simulate": "codegenome simulate",
+    "test": "echo \"Run examples with: pnpm analyze\""
+  },
+  "devDependencies": {
+    "@codegenome-x/cli": "workspace:*"
+  }
+}

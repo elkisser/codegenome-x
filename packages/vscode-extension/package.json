@@ -1,0 +1,125 @@
+{
+  "name": "codegenome-x",
+  "displayName": "CodeGenome X",
+  "description": "Professional structural analysis engine for VS Code",
+  "version": "1.0.0",
+  "publisher": "codegenome-x",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Other"
+  ],
+  "keywords": [
+    "code analysis",
+    "structural analysis",
+    "dead code",
+    "impact analysis",
+    "typescript",
+    "react",
+    "symfony"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onCommand:codegenome.analyze",
+    "onView:codegenomeExplorer"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "codegenome.analyze",
+        "title": "Analyze Project Structure",
+        "category": "CodeGenome X"
+      },
+      {
+        "command": "codegenome.simulate",
+        "title": "Simulate Node Removal",
+        "category": "CodeGenome X"
+      },
+      {
+        "command": "codegenome.refresh",
+        "title": "Refresh Analysis",
+        "category": "CodeGenome X"
+      },
+      {
+        "command": "codegenome.exploreNode",
+        "title": "Explore Node",
+        "category": "CodeGenome X"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "codegenomeExplorer",
+          "name": "CodeGenome X"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "codegenome.refresh",
+          "when": "view == codegenomeExplorer",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "codegenome.simulate",
+          "when": "view == codegenomeExplorer && viewItem == node",
+          "group": "inline"
+        },
+        {
+          "command": "codegenome.exploreNode",
+          "when": "view == codegenomeExplorer && viewItem == node",
+          "group": "inline"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "CodeGenome X",
+      "properties": {
+        "codegenome.enableAutoAnalysis": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable automatic analysis on file save"
+        },
+        "codegenome.maxWorkers": {
+          "type": "number",
+          "default": 4,
+          "description": "Maximum number of worker threads"
+        },
+        "codegenome.includePatterns": {
+          "type": "array",
+          "default": ["**/*.{ts,tsx,js,jsx,php}"],
+          "description": "File patterns to include in analysis"
+        },
+        "codegenome.excludePatterns": {
+          "type": "array",
+          "default": ["node_modules/**", "dist/**", "build/**", ".git/**"],
+          "description": "File patterns to exclude from analysis"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "tsc -p ./",
+    "dev": "tsc -watch -p ./",
+    "test": "jest",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@codegenome-x/core": "workspace:*",
+    "vscode": "^1.1.37"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/node": "^20.0.0",
+    "@vscode/vsce": "^2.19.0"
+  }
+}
