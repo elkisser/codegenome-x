@@ -2,8 +2,8 @@ import * as vscode from 'vscode';
 import { Graph, GraphNode, ImpactScore } from '@codegenome-x/core';
 
 export class CodeGenomeProvider implements vscode.TreeDataProvider<CodeGenomeItem> {
-    private _onDidChangeTreeData: vscode.EventEmitter<CodeGenomeItem | undefined | null | void> = new vscode.EventEmitter<CodeGenomeItem | undefined | null | void>();
-    readonly onDidChangeTreeData: vscode.Event<CodeGenomeItem | undefined | null | void> = this._onDidChangeTreeData.event;
+    private _onDidChangeTreeData: vscode.EventEmitter<CodeGenomeItem | undefined | null> = new vscode.EventEmitter<CodeGenomeItem | undefined | null>();
+    readonly onDidChangeTreeData: vscode.Event<CodeGenomeItem | undefined | null> = this._onDidChangeTreeData.event;
     
     private graph: Graph | undefined;
     private items: CodeGenomeItem[] = [];
@@ -39,42 +39,47 @@ export class CodeGenomeProvider implements vscode.TreeDataProvider<CodeGenomeIte
         
         if (element.type === 'node') {
             const node = element.node;
+            if (!node) {
+                return Promise.resolve([]);
+            }
             const children: CodeGenomeItem[] = [];
             
             // Add dependencies
-            const dependencies = this.graph.getDependencies(node.id);
+            const dependencies = Array.from(this.graph.getDependencies(node.id));
             if (dependencies.length > 0) {
                 children.push(new CodeGenomeItem(
                     'Dependencies',
                     vscode.TreeItemCollapsibleState.Collapsed,
                     'dependencies',
                     undefined,
-                    dependencies.map(dep => new CodeGenomeItem(
-                        dep.name,
+                    undefined,
+                    dependencies.map((dep: string) => new CodeGenomeItem(
+                        dep,
                         vscode.TreeItemCollapsibleState.None,
                         'node',
-                        dep,
                         undefined,
-                        new vscode.ThemeIcon('link')
+                        undefined,
+                        'link' as any
                     ))
                 ));
             }
             
             // Add dependents
-            const dependents = this.graph.getDependents(node.id);
+            const dependents = Array.from(this.graph.getDependents(node.id));
             if (dependents.length > 0) {
                 children.push(new CodeGenomeItem(
                     'Dependents',
                     vscode.TreeItemCollapsibleState.Collapsed,
                     'dependents',
                     undefined,
-                    dependents.map(dep => new CodeGenomeItem(
-                        dep.name,
+                    undefined,
+                    dependents.map((dep: string) => new CodeGenomeItem(
+                        dep,
                         vscode.TreeItemCollapsibleState.None,
                         'node',
-                        dep,
                         undefined,
-                        new vscode.ThemeIcon('link')
+                        undefined,
+                        'link' as any
                     ))
                 ));
             }
@@ -109,8 +114,8 @@ export class CodeGenomeProvider implements vscode.TreeDataProvider<CodeGenomeIte
             })
             .sort((a, b) => b.avgImpact - a.avgImpact);
         
-        return sortedCategories.map(({ type, nodes }) => {
-            const children = nodes
+        return sortedCategories.map(({ type, nodes, avgImpact }) => {
+            const sortedNodesList = nodes
                 .sort((a, b) => {
                     const impactA = graph.removeNodeSimulation(a.id).impactScore;
                     const impactB = graph.removeNodeSimulation(b.id).impactScore;
@@ -137,23 +142,24 @@ export class CodeGenomeProvider implements vscode.TreeDataProvider<CodeGenomeIte
                 'category',
                 undefined,
                 `Average Impact: ${avgImpact.toFixed(2)}`,
-                new vscode.ThemeIcon('symbol-namespace')
+                'symbol-namespace' as any,
+                sortedNodesList
             );
         });
     }
     
-    private getImpactIcon(impact: ImpactScore): vscode.ThemeIcon {
+    private getImpactIcon(impact: ImpactScore): any {
         switch (impact.level) {
             case 'Critical':
-                return new vscode.ThemeIcon('error', new vscode.ThemeColor('errorForeground'));
+                return 'circle-filled';
             case 'High':
-                return new vscode.ThemeIcon('warning', new vscode.ThemeColor('problemsWarningIcon.foreground'));
+                return 'warning';
             case 'Medium':
-                return new vscode.ThemeIcon('info', new vscode.ThemeColor('problemsInfoIcon.foreground'));
+                return 'info';
             case 'Low':
-                return new vscode.ThemeIcon('check', new vscode.ThemeColor('testing.iconPassed'));
+                return 'check';
             default:
-                return new vscode.ThemeIcon('symbol-variable');
+                return 'symbol-variable';
         }
     }
 }

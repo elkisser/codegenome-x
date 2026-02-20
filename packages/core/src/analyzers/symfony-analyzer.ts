@@ -20,13 +20,12 @@ export class SymfonyAnalyzer implements Analyzer {
     this.analyzeEntities(content, filePath, graph);
     
     // Analyze repositories
-    this.analyzeRepositories(content, filePath, graph);
+    this.analyzeRepositories(filePath, graph, content);
   }
 
   private analyzeControllers(content: string, filePath: string, graph: any): void {
     const controllerRegex = /class\s+(\w+).*?extends\s+(?:AbstractController|Controller)/g;
     const actionRegex = /public\s+function\s+(\w+)Action\s*\([^)]*\)/g;
-    const routeRegex = /@Route\s*\(\s*"([^"]+)"/g;
 
     let match;
     let lineNumber = 0;
@@ -35,9 +34,11 @@ export class SymfonyAnalyzer implements Analyzer {
     // Find controllers
     while ((match = controllerRegex.exec(content)) !== null) {
       const controllerName = match[1];
+      if (!controllerName) continue;
+      
       const startIndex = match.index;
       
-      lineNumber = this.getLineNumber(content, lines, startIndex);
+      lineNumber = this.getLineNumber(lines, startIndex);
       const loc = this.getBlockLoc(content, startIndex);
       
       const nodeId = `${filePath}:controller:${controllerName}:${lineNumber}`;
@@ -51,7 +52,7 @@ export class SymfonyAnalyzer implements Analyzer {
         column: 0,
         metadata: {
           controllerType: 'standard',
-          hasActions: this.hasActions(content, controllerName),
+          hasActions: this.hasActions(content),
         },
         loc,
         dependencies: new Set(),
@@ -64,7 +65,7 @@ export class SymfonyAnalyzer implements Analyzer {
       const actionName = match[1];
       const startIndex = match.index;
       
-      lineNumber = this.getLineNumber(content, lines, startIndex);
+      lineNumber = this.getLineNumber(lines, startIndex);
       const loc = this.getBlockLoc(content, startIndex);
       
       const nodeId = `${filePath}:action:${actionName}:${lineNumber}`;
@@ -89,7 +90,6 @@ export class SymfonyAnalyzer implements Analyzer {
 
   private analyzeServices(content: string, filePath: string, graph: any): void {
     const serviceRegex = /class\s+(\w+).*?implements?\s+(\w*Service\w*)/g;
-    const serviceTagRegex = /tags:\s*\[\s*['"](\w+)['"]\s*\]/g;
 
     let match;
     let lineNumber = 0;
@@ -97,9 +97,11 @@ export class SymfonyAnalyzer implements Analyzer {
 
     while ((match = serviceRegex.exec(content)) !== null) {
       const serviceName = match[1];
+      if (!serviceName) continue;
+      
       const startIndex = match.index;
       
-      lineNumber = this.getLineNumber(content, lines, startIndex);
+      lineNumber = this.getLineNumber(lines, startIndex);
       const loc = this.getBlockLoc(content, startIndex);
       
       const nodeId = `${filePath}:service:${serviceName}:${lineNumber}`;
@@ -113,7 +115,7 @@ export class SymfonyAnalyzer implements Analyzer {
         column: 0,
         metadata: {
           serviceType: match[2] || 'custom',
-          hasTag: this.hasServiceTag(content, serviceName),
+          hasTag: this.hasServiceTag(content),
         },
         loc,
         dependencies: new Set(),
@@ -124,7 +126,6 @@ export class SymfonyAnalyzer implements Analyzer {
 
   private analyzeRoutes(content: string, filePath: string, graph: any): void {
     const routeRegex = /@Route\s*\(\s*"([^"]+)".*?name="([^"]+)"/g;
-    const routeYamlRegex = /^(\w+):\s*path:\s*(\S+)/gm;
 
     let match;
     let lineNumber = 0;
@@ -135,7 +136,7 @@ export class SymfonyAnalyzer implements Analyzer {
       const routeName = match[2];
       const startIndex = match.index;
       
-      lineNumber = this.getLineNumber(content, lines, startIndex);
+      lineNumber = this.getLineNumber(lines, startIndex);
       
       const nodeId = `${filePath}:route:${routeName}:${lineNumber}`;
       
@@ -159,7 +160,6 @@ export class SymfonyAnalyzer implements Analyzer {
 
   private analyzeEntities(content: string, filePath: string, graph: any): void {
     const entityRegex = /@Entity\(\).*?class\s+(\w+)/gs;
-    const repositoryRegex = /@Repository\(\).*?class\s+(\w+)/gs;
 
     let match;
     let lineNumber = 0;
@@ -167,9 +167,11 @@ export class SymfonyAnalyzer implements Analyzer {
 
     while ((match = entityRegex.exec(content)) !== null) {
       const entityName = match[1];
+      if (!entityName) continue;
+      
       const startIndex = match.index;
       
-      lineNumber = this.getLineNumber(content, lines, startIndex);
+      lineNumber = this.getLineNumber(lines, startIndex);
       const loc = this.getBlockLoc(content, startIndex);
       
       const nodeId = `${filePath}:entity:${entityName}:${lineNumber}`;
@@ -192,7 +194,7 @@ export class SymfonyAnalyzer implements Analyzer {
     }
   }
 
-  private analyzeRepositories(content: string, filePath: string, graph: any): void {
+  private analyzeRepositories(filePath: string, graph: any, content: string): void {
     const repositoryRegex = /class\s+(\w+).*?extends\s+ServiceEntityRepository/g;
 
     let match;
@@ -201,9 +203,11 @@ export class SymfonyAnalyzer implements Analyzer {
 
     while ((match = repositoryRegex.exec(content)) !== null) {
       const repositoryName = match[1];
+      if (!repositoryName) continue;
+      
       const startIndex = match.index;
       
-      lineNumber = this.getLineNumber(content, lines, startIndex);
+      lineNumber = this.getLineNumber(lines, startIndex);
       const loc = this.getBlockLoc(content, startIndex);
       
       const nodeId = `${filePath}:repository:${repositoryName}:${lineNumber}`;
@@ -226,12 +230,15 @@ export class SymfonyAnalyzer implements Analyzer {
     }
   }
 
-  private getLineNumber(content: string, lines: string[], startIndex: number): number {
+  private getLineNumber(lines: string[], startIndex: number): number {
     let charCount = 0;
     for (let i = 0; i < lines.length; i++) {
-      charCount += lines[i].length + 1;
-      if (charCount > startIndex) {
-        return i + 1;
+      const line = lines[i];
+      if (line !== undefined) {
+        charCount += line.length + 1;
+        if (charCount > startIndex) {
+          return i + 1;
+        }
       }
     }
     return 1;
@@ -259,8 +266,8 @@ export class SymfonyAnalyzer implements Analyzer {
     return loc || 1;
   }
 
-  private hasActions(content: string, controllerName: string): boolean {
-    return new RegExp(`public function \\w+Action`).test(content);
+  private hasActions(content: string): boolean {
+    return new RegExp(`public function \w+Action`).test(content);
   }
 
   private hasRouteAnnotation(content: string, startIndex: number): boolean {
@@ -268,14 +275,14 @@ export class SymfonyAnalyzer implements Analyzer {
     return /@Route/.test(beforeContent);
   }
 
-  private hasServiceTag(content: string, serviceName: string): boolean {
+  private hasServiceTag(content: string): boolean {
     return /tags:\s*\[/.test(content);
   }
 
   private getRouteMethod(content: string, startIndex: number): string {
     const beforeContent = content.substring(Math.max(0, startIndex - 200), startIndex);
     const methodMatch = beforeContent.match(/methods\s*=\s*\[\s*["'](\w+)["']\s*\]/);
-    return methodMatch ? methodMatch[1] : 'GET';
+    return methodMatch && methodMatch[1] ? methodMatch[1] : 'GET';
   }
 
   private hasRepository(content: string, entityName: string): boolean {
@@ -283,7 +290,7 @@ export class SymfonyAnalyzer implements Analyzer {
   }
 
   private getRepositoryEntity(content: string, repositoryName: string): string {
-    const match = content.match(new RegExp(`class\s+${repositoryName}.*?@ORM\\\\Entity\(.*?class\s+(\w+)`, 's'));
-    return match ? match[1] : 'Unknown';
+    const match = content.match(new RegExp(`class\s+${repositoryName}.*?@ORM\\Entity\(.*?class\s+(\w+)`, 's'));
+    return match && match[1] ? match[1] : 'Unknown';
   }
 }

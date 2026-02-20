@@ -3,10 +3,9 @@ import { Graph, RemovalSimulation } from '@codegenome-x/core';
 
 export class WebviewPanel {
     private panel: vscode.WebviewPanel | undefined;
-    private context: vscode.ExtensionContext;
     
-    constructor(context: vscode.ExtensionContext) {
-        this.context = context;
+    constructor(_context: vscode.ExtensionContext) {
+        // context is passed for potential future use
     }
     
     show(graph: Graph): void {

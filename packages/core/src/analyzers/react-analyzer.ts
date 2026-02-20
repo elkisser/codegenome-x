@@ -10,7 +10,6 @@ export class ReactAnalyzer implements Analyzer {
     // Simple regex-based analysis for React components
     const componentRegex = /(?:function|const|class)\s+(\w+).*?(?:\(|=).*?\{[\s\S]*?return[\s\S]*?\}/g;
     const hookRegex = /(use[A-Z]\w*)\s*\(/g;
-    const jsxRegex = /<([A-Z]\w*)/g;
 
     let match;
     let lineNumber = 0;
@@ -19,15 +18,21 @@ export class ReactAnalyzer implements Analyzer {
     // Find React components
     while ((match = componentRegex.exec(content)) !== null) {
       const componentName = match[1];
+      if (!componentName) continue;
+      
       const startIndex = match.index;
+      if (startIndex === undefined) continue;
       
       // Calculate line number
       let charCount = 0;
       for (let i = 0; i < lines.length; i++) {
-        charCount += lines[i].length + 1; // +1 for newline
-        if (charCount > startIndex) {
-          lineNumber = i + 1;
-          break;
+        const line = lines[i];
+        if (line !== undefined) {
+          charCount += line.length + 1; // +1 for newline
+          if (charCount > startIndex) {
+            lineNumber = i + 1;
+            break;
+          }
         }
       }
 
@@ -55,14 +60,20 @@ export class ReactAnalyzer implements Analyzer {
     // Find React hooks
     while ((match = hookRegex.exec(content)) !== null) {
       const hookName = match[1];
+      if (!hookName) continue;
+      
       const startIndex = match.index;
+      if (startIndex === undefined) continue;
       
       let charCount = 0;
       for (let i = 0; i < lines.length; i++) {
-        charCount += lines[i].length + 1;
-        if (charCount > startIndex) {
-          lineNumber = i + 1;
-          break;
+        const line = lines[i];
+        if (line !== undefined) {
+          charCount += line.length + 1;
+          if (charCount > startIndex) {
+            lineNumber = i + 1;
+            break;
+          }
         }
       }
 

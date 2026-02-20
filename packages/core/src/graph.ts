@@ -44,22 +44,18 @@ export class Graph {
     return Array.from(nodeIds).map(id => this.nodes.get(id)!).filter(Boolean);
   }
 
-  getDependencies(nodeId: string): GraphNode[] {
+  getDependencies(nodeId: string): Set<string> {
     const node = this.nodes.get(nodeId);
-    if (!node) return [];
+    if (!node) return new Set();
     
-    return Array.from(node.dependencies)
-      .map(depId => this.nodes.get(depId))
-      .filter(Boolean) as GraphNode[];
+    return node.dependencies;
   }
 
-  getDependents(nodeId: string): GraphNode[] {
+  getDependents(nodeId: string): Set<string> {
     const node = this.nodes.get(nodeId);
-    if (!node) return [];
+    if (!node) return new Set();
     
-    return Array.from(node.dependents)
-      .map(depId => this.nodes.get(depId))
-      .filter(Boolean) as GraphNode[];
+    return node.dependents;
   }
 
   getAllNodes(): GraphNode[] {
@@ -89,13 +85,13 @@ export class Graph {
     const dependents = this.getDependents(nodeId);
     const dependencies = this.getDependencies(nodeId);
 
-    dependents.forEach(dep => affectedNodes.add(dep.id));
+    dependents.forEach(depId => affectedNodes.add(depId));
 
     // Find orphaned nodes (nodes that would have no dependencies)
-    dependencies.forEach(dep => {
-      const depNode = this.nodes.get(dep.id);
+    dependencies.forEach(depId => {
+      const depNode = this.nodes.get(depId);
       if (depNode && depNode.dependents.size === 1 && depNode.dependents.has(nodeId)) {
-        orphanedNodes.add(dep.id);
+        orphanedNodes.add(depId);
       }
     });
 
@@ -104,17 +100,19 @@ export class Graph {
       brokenEndpoints.add(nodeId);
     }
     
-    dependents.forEach(dep => {
-      if (dep.type === 'endpoint') {
-        brokenEndpoints.add(dep.id);
+    dependents.forEach(depId => {
+      const depNode = this.nodes.get(depId);
+      if (depNode && depNode.type === 'endpoint') {
+        brokenEndpoints.add(depId);
       }
     });
 
     // Find services without providers
     if (node.type === 'provider') {
-      dependents.forEach(dep => {
-        if (dep.type === 'service') {
-          servicesWithoutProvider.add(dep.id);
+      dependents.forEach(depId => {
+        const depNode = this.nodes.get(depId);
+        if (depNode && depNode.type === 'service') {
+          servicesWithoutProvider.add(depId);
         }
       });
     }
@@ -167,8 +165,8 @@ export class Graph {
       maxDepth = Math.max(maxDepth, depth);
       
       const dependencies = this.getDependencies(currentId);
-      dependencies.forEach(dep => {
-        dfs(dep.id, depth + 1);
+      dependencies.forEach(depId => {
+        dfs(depId, depth + 1);
       });
     };
 

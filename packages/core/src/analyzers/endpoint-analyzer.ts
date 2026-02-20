@@ -59,7 +59,7 @@ export class EndpointAnalyzer implements Analyzer {
       const method = match[2] || 'GET';
       const startIndex = match.index;
       
-      lineNumber = this.getLineNumber(content, lines, startIndex);
+      lineNumber = this.getLineNumber(lines, startIndex);
       
       const nodeId = `${filePath}:endpoint:${type}:${method}:${path}:${lineNumber}`;
       
@@ -92,9 +92,10 @@ export class EndpointAnalyzer implements Analyzer {
     while ((match = regex.exec(content)) !== null) {
       const url = match[1] || match[2];
       const method = match[1] ? match[1] : 'GET';
+      if (!url) continue;
       const startIndex = match.index;
       
-      lineNumber = this.getLineNumber(content, lines, startIndex);
+      lineNumber = this.getLineNumber(lines, startIndex);
       
       const nodeId = `${filePath}:client_call:${type}:${method}:${url}:${lineNumber}`;
       
@@ -125,10 +126,11 @@ export class EndpointAnalyzer implements Analyzer {
 
     while ((match = regex.exec(content)) !== null) {
       const path = match[1];
+      if (!path) continue;
       const methods = match[2] ? match[2].replace(/['"\s]/g, '').split(',') : ['GET'];
       const startIndex = match.index;
       
-      lineNumber = this.getLineNumber(content, lines, startIndex);
+      lineNumber = this.getLineNumber(lines, startIndex);
       
       methods.forEach(method => {
         const nodeId = `${filePath}:endpoint:symfony:${type}:${method}:${path}:${lineNumber}`;
@@ -163,8 +165,9 @@ export class EndpointAnalyzer implements Analyzer {
 
     while ((match = regex.exec(content)) !== null) {
       const startIndex = match.index;
+      if (startIndex === undefined) continue;
       
-      lineNumber = this.getLineNumber(content, lines, startIndex);
+      lineNumber = this.getLineNumber(lines, startIndex);
       
       const nodeId = `${filePath}:endpoint:api_platform:${lineNumber}`;
       
@@ -188,12 +191,15 @@ export class EndpointAnalyzer implements Analyzer {
     }
   }
 
-  private getLineNumber(content: string, lines: string[], startIndex: number): number {
+  private getLineNumber(lines: string[], startIndex: number): number {
     let charCount = 0;
     for (let i = 0; i < lines.length; i++) {
-      charCount += lines[i].length + 1;
-      if (charCount > startIndex) {
-        return i + 1;
+      const line = lines[i];
+      if (line !== undefined) {
+        charCount += line.length + 1;
+        if (charCount > startIndex) {
+          return i + 1;
+        }
       }
     }
     return 1;

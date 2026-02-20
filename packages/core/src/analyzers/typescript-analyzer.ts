@@ -1,16 +1,12 @@
-import { Analyzer, AnalysisContext } from './types.js';
-import { Graph } from './graph.js';
-import * as ts from '@typescript-eslint/parser';
+import { Analyzer, AnalysisContext } from '../types.js';
 import { parse } from '@typescript-eslint/typescript-estree';
-import { readFileSync } from 'fs';
-import { join } from 'path';
 
 export class TypeScriptAnalyzer implements Analyzer {
   name = 'TypeScriptAnalyzer';
   supportedExtensions = ['.ts', '.tsx'];
 
   async analyze(context: AnalysisContext): Promise<void> {
-    const { filePath, content, graph } = context;
+    const { filePath, content } = context;
     
     try {
       const ast = parse(content, {

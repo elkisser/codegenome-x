@@ -1,10 +1,8 @@
 import { Worker } from 'worker_threads';
 import { join } from 'path';
-import { readFileSync } from 'fs';
 import { glob } from 'glob';
-import { createHash } from 'crypto';
 import { Graph } from './graph.js';
-import { Analyzer, AnalysisContext } from './types.js';
+import { Analyzer } from './types.js';
 import { TypeScriptAnalyzer } from './analyzers/typescript-analyzer.js';
 import { ReactAnalyzer } from './analyzers/react-analyzer.js';
 import { SymfonyAnalyzer } from './analyzers/symfony-analyzer.js';
@@ -34,8 +32,9 @@ export interface AnalysisResult {
 export class AnalysisEngine {
   private analyzers: Analyzer[] = [];
   private graph: Graph = new Graph();
-  private cache: Map<string, string> = new Map();
-  private enableCache: boolean = true;
+  // Cache functionality will be implemented later
+  // private cache: Map<string, string> = new Map();
+  // private enableCache: boolean = true;
 
   constructor() {
     this.registerAnalyzers();
@@ -56,10 +55,7 @@ export class AnalysisEngine {
       includePatterns = ['**/*.{ts,tsx,js,jsx,php}'],
       excludePatterns = ['node_modules/**', 'dist/**', 'build/**', '.git/**'],
       maxWorkers = 4,
-      enableCache = true,
     } = options;
-
-    this.enableCache = enableCache;
 
     // Find all files to analyze
     const files = await this.findFiles(projectPath, includePatterns, excludePatterns);
@@ -152,64 +148,7 @@ export class AnalysisEngine {
     });
   }
 
-  private async processFile(filePath: string, projectPath: string): Promise<{ nodes: any[], edges: any[] }> {
-    try {
-      // Check cache first
-      if (this.enableCache) {
-        const fileHash = await this.getFileHash(filePath);
-        const cached = this.cache.get(fileHash);
-        if (cached) {
-          return JSON.parse(cached);
-        }
-      }
-      
-      const content = readFileSync(filePath, 'utf-8');
-      const graph = new Graph();
-      
-      const context: AnalysisContext = {
-        projectPath,
-        filePath,
-        content,
-        graph,
-      };
-      
-      // Find appropriate analyzer
-      const analyzer = this.findAnalyzer(filePath);
-      if (analyzer) {
-        await analyzer.analyze(context);
-      }
-      
-      const result = {
-        nodes: graph.getAllNodes(),
-        edges: graph.getAllEdges(),
-      };
-      
-      // Cache result
-      if (this.enableCache) {
-        const fileHash = await this.getFileHash(filePath);
-        this.cache.set(fileHash, JSON.stringify(result));
-      }
-      
-      return result;
-    } catch (error) {
-      console.warn(`Failed to process file: ${filePath}`, error);
-      return { nodes: [], edges: [] };
-    }
-  }
 
-  private findAnalyzer(filePath: string): Analyzer | undefined {
-    const extension = filePath.split('.').pop()?.toLowerCase();
-    if (!extension) return undefined;
-    
-    return this.analyzers.find(analyzer =>
-      analyzer.supportedExtensions.some(ext => filePath.endsWith(ext))
-    );
-  }
-
-  private async getFileHash(filePath: string): Promise<string> {
-    const content = readFileSync(filePath, 'utf-8');
-    return createHash('sha256').update(content).digest('hex');
-  }
 
   getGraph(): Graph {
     return this.graph;

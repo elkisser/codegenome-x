@@ -43,7 +43,30 @@ export interface AnalysisContext {
   filePath: string;
   content: string;
   ast?: unknown;
-  graph: Graph;
+  graph: any; // Use 'any' to avoid circular dependency, will be typed properly in implementation
+}
+
+export interface AnalysisOptions {
+  projectPath: string;
+  includePatterns?: string[];
+  excludePatterns?: string[];
+  maxWorkers?: number;
+  enableCache?: boolean;
+  cacheDirectory?: string;
+  verbose?: boolean;
+}
+
+export interface AnalysisResult {
+  graph: any; // Use 'any' to avoid circular dependency, will be typed properly in implementation
+  stats: {
+    totalFiles: number;
+    totalNodes: number;
+    totalEdges: number;
+    processingTime: number;
+    cacheHits: number;
+    cacheMisses: number;
+  };
+  duration: number;
 }
 
 export interface Analyzer {

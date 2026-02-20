@@ -1,13 +1,15 @@
 import * as vscode from 'vscode';
-import { AnalysisEngine, GraphNode, ImpactScore } from '@codegenome-x/core';
+import { AnalysisEngine } from '@codegenome-x/core';
 import { CodeGenomeProvider } from './tree-provider';
 import { WebviewPanel } from './webview-panel';
 
 let analysisEngine: AnalysisEngine;
 let treeDataProvider: CodeGenomeProvider;
 let webviewPanel: WebviewPanel | undefined;
+let extensionContext: vscode.ExtensionContext;
 
 export function activate(context: vscode.ExtensionContext) {
+    extensionContext = context;
     console.log('CodeGenome X extension is now active');
     
     analysisEngine = new AnalysisEngine();
@@ -49,12 +51,17 @@ export function deactivate() {
 
 async function analyzeProject() {
     const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders) {
+    if (!workspaceFolders || workspaceFolders.length === 0) {
         vscode.window.showWarningMessage('No workspace folder open');
         return;
     }
     
-    const projectPath = workspaceFolders[0].uri.fsPath;
+    const workspaceFolder = workspaceFolders[0];
+    if (!workspaceFolder) {
+        vscode.window.showWarningMessage('Could not access workspace folder');
+        return;
+    }
+    const projectPath = workspaceFolder.uri.fsPath;
     const config = vscode.workspace.getConfiguration('codegenome');
     
     const progress = vscode.window.withProgress({
@@ -88,7 +95,7 @@ async function analyzeProject() {
             
             // Show webview if not already open
             if (!webviewPanel) {
-                webviewPanel = new WebviewPanel(context);
+                webviewPanel = new WebviewPanel(extensionContext);
             }
             webviewPanel.show(graph);
             
@@ -108,7 +115,7 @@ async function simulateNodeRemoval(nodeId: string) {
         
         // Show results in webview
         if (!webviewPanel) {
-            webviewPanel = new WebviewPanel(context);
+            webviewPanel = new WebviewPanel(extensionContext);
         }
         webviewPanel.showSimulation(simulation);
         
