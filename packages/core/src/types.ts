@@ -11,12 +11,16 @@ export interface GraphNode {
   dependents: Set<string>;
 }
 
+export type Node = GraphNode;
+
 export interface GraphEdge {
   from: string;
   to: string;
   type: string;
   metadata: Record<string, unknown>;
 }
+
+export type Edge = GraphEdge;
 
 export interface ImpactScore {
   score: number;
@@ -27,6 +31,15 @@ export interface ImpactScore {
     fanIn: number;
     dependencyDepth: number;
   };
+}
+
+export interface Graph {
+  addNode(node: GraphNode): void;
+  addEdge(from: string, to: string, type: string, metadata?: Record<string, unknown>): void;
+  getAllNodes(): GraphNode[];
+  getAllEdges(): GraphEdge[];
+  getStats(): any;
+  removeNodeSimulation(nodeId: string): RemovalSimulation;
 }
 
 export interface RemovalSimulation {

@@ -1,12 +1,16 @@
-import { Worker } from 'worker_threads';
-import { join } from 'path';
-import { glob } from 'glob';
+import { resolve } from 'path';
 import { Graph } from './graph.js';
 import { Analyzer } from './types.js';
 import { TypeScriptAnalyzer } from './analyzers/typescript-analyzer.js';
 import { ReactAnalyzer } from './analyzers/react-analyzer.js';
 import { SymfonyAnalyzer } from './analyzers/symfony-analyzer.js';
 import { EndpointAnalyzer } from './analyzers/endpoint-analyzer.js';
+import { IgnoreEngine } from './ignore/ignore-engine.js';
+import { FileWalker } from './fs/file-walker.js';
+import { CacheEngine } from './cache/cache-engine.js';
+import { UnusedDetector } from './analysis/unused-detector.js';
+import { TypeScriptEdgeDetector } from './edges/typescript-edge-detector.js';
+import { SymfonyEdgeDetector } from './edges/symfony-edge-detector.js';
 
 export interface AnalysisOptions {
   projectPath: string;
@@ -15,26 +19,42 @@ export interface AnalysisOptions {
   maxWorkers?: number;
   enableCache?: boolean;
   cacheDir?: string;
+  debug?: boolean;
+  ignoreFile?: string;
 }
 
 export interface AnalysisResult {
   graph: Graph;
   stats: {
     filesAnalyzed: number;
+    filesIgnored: number;
+    filesSkipped: number;
     nodesCreated: number;
     edgesCreated: number;
     processingTime: number;
     cacheHits: number;
     cacheMisses: number;
+    deadCodeEstimate: number;
+    unusedNodesCount: number;
+    edgesByType: Record<string, number>;
   };
+  unusedAnalysis?: any;
 }
 
 export class AnalysisEngine {
   private analyzers: Analyzer[] = [];
   private graph: Graph = new Graph();
-  // Cache functionality will be implemented later
-  // private cache: Map<string, string> = new Map();
-  // private enableCache: boolean = true;
+  private ignoreEngine: IgnoreEngine | null = null;
+  private cacheEngine: CacheEngine | null = null;
+  private projectRoot: string = '';
+  private debug: boolean = false;
+  private stats = {
+    cacheHits: 0,
+    cacheMisses: 0,
+    filesAnalyzed: 0,
+    filesIgnored: 0,
+    filesSkipped: 0,
+  };
 
   constructor() {
     this.registerAnalyzers();
@@ -49,106 +69,170 @@ export class AnalysisEngine {
 
   async analyze(options: AnalysisOptions): Promise<AnalysisResult> {
     const startTime = Date.now();
-    
-    const {
-      projectPath,
-      includePatterns = ['**/*.{ts,tsx,js,jsx,php}'],
-      excludePatterns = ['node_modules/**', 'dist/**', 'build/**', '.git/**'],
-      maxWorkers = 4,
-    } = options;
+    this.debug = options.debug || false;
+    this.projectRoot = resolve(options.projectPath);
 
-    // Find all files to analyze
-    const files = await this.findFiles(projectPath, includePatterns, excludePatterns);
-    
-    // Process files in parallel using workers
-    const results = await this.processFilesInParallel(files, projectPath, maxWorkers);
-    
-    // Merge results into main graph
-    results.forEach(result => {
-      result.nodes.forEach(node => this.graph.addNode(node));
-      result.edges.forEach(edge => {
-        this.graph.addEdge(edge.from, edge.to, edge.type, edge.metadata);
-      });
+    // Initialize ignore engine
+    this.ignoreEngine = new IgnoreEngine(
+      {
+        projectRoot: this.projectRoot,
+        customIgnoreFile: options.ignoreFile,
+        debug: this.debug,
+      }
+    );
+
+    // Initialize cache if enabled
+    if (options.enableCache !== false) {
+      this.cacheEngine = new CacheEngine(this.projectRoot, this.debug);
+    }
+
+    // Create file walker
+    const walker = new FileWalker({
+      projectRoot: this.projectRoot,
+      ignoreEngine: this.ignoreEngine,
+      debug: this.debug,
     });
 
+    // Get all files
+    const files = await walker.walk();
+    const walkerStats = walker.getStats();
+
+    if (this.debug) {
+      console.log(`[Engine] Found ${files.length} files to analyze`);
+    }
+
+    // Create file content map for cache
+    const fileMap = new Map(files.map((f) => [f.relativePath, f.content]));
+
+    // Get changed files
+    let filesToAnalyze = files;
+    if (this.cacheEngine) {
+      const changed = this.cacheEngine.getChangedFiles(fileMap);
+      filesToAnalyze = files.filter((f) => changed.includes(f.relativePath));
+
+      this.stats.cacheHits = files.length - filesToAnalyze.length;
+      this.stats.cacheMisses = filesToAnalyze.length;
+
+      if (this.debug) {
+        console.log(`[Engine] Cache: ${this.stats.cacheHits} hits, ${this.stats.cacheMisses} misses`);
+      }
+    }
+
+    // Analyze files
+    for (const file of filesToAnalyze) {
+      await this.analyzeFile(file.path, file.content, file.extension);
+    }
+
+    // Run unused detection
+    const unusedDetector = new UnusedDetector(this.graph, this.debug);
+    const unusedAnalysis = unusedDetector.analyze();
+    unusedDetector.markUnusedMetadata();
+
+    // Calculate dead code estimate
+    const deadCodeEstimate = Math.round(
+      (unusedAnalysis.unusedNodes.length / this.graph.getAllNodes().length) * 100
+    ) || 0;
+
+    // Count edges by type
+    const edgesByType: Record<string, number> = {};
+    for (const edge of this.graph.getAllEdges()) {
+      edgesByType[edge.type] = (edgesByType[edge.type] || 0) + 1;
+    }
+
+    // Save cache
+    if (this.cacheEngine) {
+      for (const file of filesToAnalyze) {
+        const relPath = file.relativePath || '';
+        const nodes = this.graph.getAllNodes()
+          .filter((n: any) => (n.metadata?.file === relPath))
+          .map((n: any) => n.id);
+        const edges = this.graph.getAllEdges()
+          .filter((e: any) => (e.metadata?.file === relPath))
+          .map((e: any) => `${e.from}-${e.to}`);
+
+        this.cacheEngine.setCacheEntry(relPath, file.content, nodes, edges);
+      }
+      this.cacheEngine.save();
+    }
+
     const processingTime = Date.now() - startTime;
-    
+
     return {
       graph: this.graph,
       stats: {
-        filesAnalyzed: files.length,
+        filesAnalyzed: walkerStats.filesProcessed,
+        filesIgnored: walkerStats.filesIgnored,
+        filesSkipped: walkerStats.filesSkipped,
         nodesCreated: this.graph.getAllNodes().length,
         edgesCreated: this.graph.getAllEdges().length,
         processingTime,
-        cacheHits: 0, // TODO: Implement cache tracking
-        cacheMisses: 0,
+        cacheHits: this.stats.cacheHits,
+        cacheMisses: this.stats.cacheMisses,
+        deadCodeEstimate,
+        unusedNodesCount: unusedAnalysis.unusedNodes.length,
+        edgesByType,
       },
+      unusedAnalysis,
     };
   }
 
-  private async findFiles(
-    projectPath: string,
-    includePatterns: string[],
-    excludePatterns: string[]
-  ): Promise<string[]> {
-    const allFiles: string[] = [];
-    
-    for (const pattern of includePatterns) {
-      const files = await glob(pattern, {
-        cwd: projectPath,
-        ignore: excludePatterns,
-        absolute: true,
-      });
-      allFiles.push(...files);
-    }
-    
-    // Remove duplicates
-    return [...new Set(allFiles)];
-  }
+  private async analyzeFile(filePath: string, content: string, extension: string): Promise<void> {
+    // Try all analyzers
+    for (const analyzer of this.analyzers) {
+      try {
+        // Create analysis context
+        const context = {
+          projectPath: this.projectRoot || '',
+          filePath,
+          content,
+          graph: this.graph,
+        };
 
-  private async processFilesInParallel(
-    files: string[],
-    projectPath: string,
-    maxWorkers: number
-  ): Promise<Array<{ nodes: any[], edges: any[] }>> {
-    const chunkSize = Math.ceil(files.length / maxWorkers);
-    const chunks = this.chunkArray(files, chunkSize);
-    
-    const workers = chunks.map(chunk => this.createWorker(chunk, projectPath));
-    const results = await Promise.all(workers);
-    
-    return results;
-  }
+        await analyzer.analyze(context);
 
-  private chunkArray<T>(array: T[], chunkSize: number): T[][] {
-    const chunks: T[][] = [];
-    for (let i = 0; i < array.length; i += chunkSize) {
-      chunks.push(array.slice(i, i + chunkSize));
-    }
-    return chunks;
-  }
+        // Detect edges based on language
+        if (extension === '.ts' || extension === '.tsx' || extension === '.js' || extension === '.jsx') {
+          const tsDetector = new TypeScriptEdgeDetector(this.projectRoot || '', this.debug);
+          const tsEdges = tsDetector.detect(filePath, content);
 
-  private createWorker(files: string[], projectPath: string): Promise<{ nodes: any[], edges: any[] }> {
-    return new Promise((resolve, reject) => {
-      const worker = new Worker(join(__dirname, 'worker.js'), {
-        workerData: { files, projectPath },
-      });
-      
-      worker.on('message', (result) => {
-        resolve(result);
-      });
-      
-      worker.on('error', reject);
-      
-      worker.on('exit', (code) => {
-        if (code !== 0) {
-          reject(new Error(`Worker stopped with exit code ${code}`));
+          for (const edge of tsEdges) {
+            this.graph.addEdge(
+              edge.source,
+              edge.target,
+              edge.type,
+              edge.metadata
+            );
+          }
         }
-      });
-    });
+
+        if (extension === '.php') {
+          const symDetector = new SymfonyEdgeDetector(this.projectRoot || '', this.debug);
+          const symEdges = symDetector.detect(filePath, content);
+
+          for (const edge of symEdges) {
+            this.graph.addEdge(
+              edge.source,
+              edge.target,
+              edge.type,
+              edge.metadata
+            );
+          }
+        }
+
+        if (this.debug) {
+          console.log(
+            `[Engine] Analyzed ${analyzer.name} for ${filePath}`
+          );
+        }
+
+        break; // Use first matching analyzer
+      } catch (error) {
+        if (this.debug) {
+          console.warn(`[Engine] Analyzer ${analyzer.name} failed for ${filePath}:`, error);
+        }
+      }
+    }
   }
-
-
 
   getGraph(): Graph {
     return this.graph;

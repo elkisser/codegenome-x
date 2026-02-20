@@ -2,6 +2,7 @@
   "name": "@codegenome-x/core",
   "version": "1.0.0",
   "description": "Core engine for CodeGenome X",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -16,7 +17,9 @@
     "@typescript-eslint/parser": "^6.0.0",
     "@typescript-eslint/typescript-estree": "^6.0.0",
     "glob": "^10.0.0",
-    "hash-wasm": "^4.10.0"
+    "hash-wasm": "^4.10.0",
+    "minimatch": "^9.0.0",
+    "typescript": "^5.0.0"
   },
   "devDependencies": {
     "@types/glob": "^8.0.0",
