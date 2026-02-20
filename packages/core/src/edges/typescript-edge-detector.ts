@@ -4,7 +4,7 @@ import { resolve, dirname, relative } from 'path';
 export interface Edge {
   source: string;
   target: string;
-  type: 'imports' | 'exports' | 'calls' | 'extends' | 'implements' | 'depends_on';
+  type: 'imports' | 'exports' | 'calls' | 'extends' | 'implements' | 'depends_on' | 'defines' | 'accesses' | 'uses_decorator';
   metadata?: Record<string, any>;
 }
 
@@ -110,8 +110,9 @@ export class TypeScriptEdgeDetector {
     }
 
     // Detect decorators
-    if (node.decorators) {
-      this.handleDecorators(node.decorators, filePath);
+    const decorators = (node as any).decorators;
+    if (decorators && Array.isArray(decorators)) {
+      this.handleDecorators(decorators, filePath);
     }
 
     // Recursively visit children

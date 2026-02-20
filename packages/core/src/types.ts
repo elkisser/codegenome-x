@@ -72,14 +72,19 @@ export interface AnalysisOptions {
 export interface AnalysisResult {
   graph: any; // Use 'any' to avoid circular dependency, will be typed properly in implementation
   stats: {
-    totalFiles: number;
-    totalNodes: number;
-    totalEdges: number;
+    filesAnalyzed: number;
+    filesIgnored: number;
+    filesSkipped: number;
+    nodesCreated: number;
+    edgesCreated: number;
     processingTime: number;
     cacheHits: number;
     cacheMisses: number;
+    deadCodeEstimate: number;
+    unusedNodesCount: number;
+    edgesByType: Record<string, number>;
   };
-  duration: number;
+  unusedAnalysis?: any;
 }
 
 export interface Analyzer {

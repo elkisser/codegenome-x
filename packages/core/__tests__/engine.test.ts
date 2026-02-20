@@ -1,5 +1,4 @@
 import { AnalysisEngine } from '../src/engine';
-import { Graph } from '../src/graph';
 import { AnalysisOptions } from '../src/types';
 
 // Mock fs and path modules
@@ -14,10 +13,7 @@ jest.mock('fs', () => ({
 jest.mock('path', () => ({
   join: jest.fn((...args) => args.join('/')),
   resolve: jest.fn((path) => path),
-  extname: jest.fn((path) => '.ts'),
-}));
-
-jest.mock('glob', () => ({
+    extname: jest.fn((filePath) => '.ts'),
   glob: jest.fn(() => Promise.resolve(['/test/file1.ts', '/test/file2.ts'])),
 }));
 
@@ -54,9 +50,9 @@ describe('AnalysisEngine', () => {
       expect(result).toBeDefined();
       expect(result.graph).toBeDefined();
       expect(result.stats).toBeDefined();
-      expect(result.stats.totalFiles).toBeGreaterThan(0);
-      expect(result.stats.totalNodes).toBeGreaterThan(0);
-      expect(result.duration).toBeGreaterThan(0);
+      expect(result.stats.filesAnalyzed).toBeGreaterThan(0);
+      expect(result.stats.nodesCreated).toBeGreaterThan(0);
+      expect(result.stats.processingTime).toBeGreaterThan(0);
     });
 
     it('should handle empty project', async () => {
@@ -72,9 +68,9 @@ describe('AnalysisEngine', () => {
 
       const result = await engine.analyze(options);
 
-      expect(result.stats.totalFiles).toBe(0);
-      expect(result.stats.totalNodes).toBe(0);
-      expect(result.graph.getAllNodes().size).toBe(0);
+      expect(result.stats.filesAnalyzed).toBe(0);
+      expect(result.stats.nodesCreated).toBe(0);
+      expect(result.graph.getAllNodes().length).toBe(0);
     });
 
     it('should respect exclude patterns', async () => {
@@ -90,7 +86,7 @@ describe('AnalysisEngine', () => {
 
       const result = await engine.analyze(options);
 
-      expect(result.stats.totalFiles).toBe(1); // Only file1.ts should be processed
+      expect(result.stats.filesAnalyzed).toBe(1); // Only file1.ts should be processed
     });
 
     it('should handle file read errors gracefully', async () => {
@@ -125,7 +121,7 @@ describe('AnalysisEngine', () => {
       expect(result1).toBeDefined();
       expect(result2).toBeDefined();
       // Both should have same results
-      expect(result2.stats.totalNodes).toBe(result1.stats.totalNodes);
+      expect(result2.stats.nodesCreated).toBe(result1.stats.nodesCreated);
     });
   });
 
@@ -176,8 +172,8 @@ describe('AnalysisEngine', () => {
 
       const result = await engine.analyze(options);
 
-      expect(result.stats.totalFiles).toBe(fileCount);
-      expect(result.duration).toBeLessThan(10000); // Should handle 100 files in reasonable time
+      expect(result.stats.filesAnalyzed).toBe(fileCount);
+      expect(result.stats.processingTime).toBeLessThan(10000); // Should handle 100 files in reasonable time
     });
   });
 
