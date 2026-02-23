@@ -10,6 +10,7 @@ export class WebviewPanel {
     
     show(graph: Graph): void {
         if (this.panel) {
+            this.panel.title = 'CodeGenome X Analysis';
             this.panel.reveal();
         } else {
             this.panel = vscode.window.createWebviewPanel(
@@ -32,6 +33,7 @@ export class WebviewPanel {
     
     showSimulation(simulation: RemovalSimulation): void {
         if (this.panel) {
+            this.panel.title = 'CodeGenome X Simulation';
             this.panel.reveal();
         } else {
             this.panel = vscode.window.createWebviewPanel(
@@ -60,7 +62,7 @@ export class WebviewPanel {
         const highImpactNodes = nodes
             .map(node => ({
                 node,
-                impact: graph.removeNodeSimulation(node.id).impactScore,
+                impact: graph.getImpactScore(node.id) || { score: 0, level: 'Low', factors: {} } as any,
             }))
             .filter(({ impact }) => impact.level === 'High' || impact.level === 'Critical')
             .sort((a, b) => b.impact.score - a.impact.score)

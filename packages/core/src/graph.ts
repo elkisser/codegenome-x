@@ -5,8 +5,11 @@ export class Graph {
   private edges: Map<string, GraphEdge[]> = new Map();
   private nodeTypes: Map<string, Set<string>> = new Map();
 
+  private impactScoreCache: Map<string, ImpactScore> = new Map();
+
   addNode(node: GraphNode): void {
     this.nodes.set(node.id, node);
+    this.impactScoreCache.clear(); // Invalidate cache on change
     
     if (!this.nodeTypes.has(node.type)) {
       this.nodeTypes.set(node.type, new Set());
@@ -19,11 +22,11 @@ export class Graph {
   }
 
   addEdge(from: string, to: string, type: string, metadata: Record<string, unknown> = {}): void {
-    if (!this.nodes.has(from) || !this.nodes.has(to)) {
-      throw new Error(`Node not found: ${!this.nodes.has(from) ? from : to}`);
-    }
+    this.ensureNodeExists(from);
+    this.ensureNodeExists(to);
 
     const edge: GraphEdge = { from, to, type, metadata };
+    this.impactScoreCache.clear(); // Invalidate cache on change
     
     const fromEdges = this.edges.get(from) || [];
     fromEdges.push(edge);
@@ -35,6 +38,23 @@ export class Graph {
 
   getNode(id: string): GraphNode | undefined {
     return this.nodes.get(id);
+  }
+
+  private ensureNodeExists(id: string): void {
+    if (!this.nodes.has(id)) {
+      this.addNode({
+        id,
+        type: 'unknown',
+        name: id,
+        filePath: '',
+        line: 0,
+        column: 0,
+        metadata: { kind: 'auto-generated' },
+        loc: 0,
+        dependencies: new Set(),
+        dependents: new Set()
+      });
+    }
   }
 
   getNodesByType(type: string): GraphNode[] {
@@ -129,7 +149,17 @@ export class Graph {
     };
   }
 
+  getImpactScore(nodeId: string): ImpactScore | undefined {
+    const node = this.nodes.get(nodeId);
+    if (!node) return undefined;
+    return this.calculateImpactScore(node);
+  }
+
   private calculateImpactScore(node: GraphNode): ImpactScore {
+    if (this.impactScoreCache.has(node.id)) {
+      return this.impactScoreCache.get(node.id)!;
+    }
+
     const fanOut = node.dependencies.size;
     const fanIn = node.dependents.size;
     const dependencyDepth = this.calculateDependencyDepth(node.id);
@@ -142,7 +172,7 @@ export class Graph {
     else if (score < 100) level = 'High';
     else level = 'Critical';
 
-    return {
+    const impact: ImpactScore = {
       score,
       level,
       factors: {
@@ -152,6 +182,9 @@ export class Graph {
         dependencyDepth
       }
     };
+    
+    this.impactScoreCache.set(node.id, impact);
+    return impact;
   }
 
   private calculateDependencyDepth(nodeId: string): number {

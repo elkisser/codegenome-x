@@ -11,7 +11,7 @@ export class CodeGenomeProvider implements vscode.TreeDataProvider<CodeGenomeIte
     constructor() {}
     
     refresh(): void {
-        this._onDidChangeTreeData.fire();
+        this._onDidChangeTreeData.fire(undefined);
     }
     
     updateData(graph: Graph): void {
@@ -53,13 +53,14 @@ export class CodeGenomeProvider implements vscode.TreeDataProvider<CodeGenomeIte
                     'dependencies',
                     undefined,
                     undefined,
+                    new vscode.ThemeIcon('references'),
                     dependencies.map((dep: string) => new CodeGenomeItem(
                         dep,
                         vscode.TreeItemCollapsibleState.None,
                         'node',
+                        this.graph!.getNode(dep), // Pass node object if available
                         undefined,
-                        undefined,
-                        'link' as any
+                        new vscode.ThemeIcon('link')
                     ))
                 ));
             }
@@ -73,13 +74,14 @@ export class CodeGenomeProvider implements vscode.TreeDataProvider<CodeGenomeIte
                     'dependents',
                     undefined,
                     undefined,
+                    new vscode.ThemeIcon('references'),
                     dependents.map((dep: string) => new CodeGenomeItem(
                         dep,
                         vscode.TreeItemCollapsibleState.None,
                         'node',
+                        this.graph!.getNode(dep),
                         undefined,
-                        undefined,
-                        'link' as any
+                        new vscode.ThemeIcon('link')
                     ))
                 ));
             }
@@ -106,8 +108,8 @@ export class CodeGenomeProvider implements vscode.TreeDataProvider<CodeGenomeIte
         const sortedCategories = Array.from(categories.entries())
             .map(([type, nodes]) => {
                 const avgImpact = nodes.reduce((sum, node) => {
-                    const impact = graph.removeNodeSimulation(node.id).impactScore;
-                    return sum + impact.score;
+                    const impact = graph.getImpactScore(node.id);
+                    return sum + (impact ? impact.score : 0);
                 }, 0) / nodes.length;
                 
                 return { type, nodes, avgImpact };
@@ -117,12 +119,12 @@ export class CodeGenomeProvider implements vscode.TreeDataProvider<CodeGenomeIte
         return sortedCategories.map(({ type, nodes, avgImpact }) => {
             const sortedNodesList = nodes
                 .sort((a, b) => {
-                    const impactA = graph.removeNodeSimulation(a.id).impactScore;
-                    const impactB = graph.removeNodeSimulation(b.id).impactScore;
-                    return impactB.score - impactA.score;
+                    const impactA = graph.getImpactScore(a.id)?.score || 0;
+                    const impactB = graph.getImpactScore(b.id)?.score || 0;
+                    return impactB - impactA;
                 })
                 .map(node => {
-                    const impact = graph.removeNodeSimulation(node.id).impactScore;
+                    const impact = graph.getImpactScore(node.id) || { score: 0, level: 'Low' } as ImpactScore;
                     const icon = this.getImpactIcon(impact);
                     const tooltip = `Impact Score: ${impact.score.toFixed(2)} (${impact.level})\nFile: ${node.filePath}:${node.line}`;
                     
@@ -142,24 +144,24 @@ export class CodeGenomeProvider implements vscode.TreeDataProvider<CodeGenomeIte
                 'category',
                 undefined,
                 `Average Impact: ${avgImpact.toFixed(2)}`,
-                'symbol-namespace' as any,
+                new vscode.ThemeIcon('symbol-namespace'),
                 sortedNodesList
             );
         });
     }
     
-    private getImpactIcon(impact: ImpactScore): any {
+    private getImpactIcon(impact: ImpactScore): vscode.ThemeIcon {
         switch (impact.level) {
             case 'Critical':
-                return 'circle-filled';
+                return new vscode.ThemeIcon('circle-filled', new vscode.ThemeColor('charts.red'));
             case 'High':
-                return 'warning';
+                return new vscode.ThemeIcon('warning', new vscode.ThemeColor('charts.orange'));
             case 'Medium':
-                return 'info';
+                return new vscode.ThemeIcon('info', new vscode.ThemeColor('charts.yellow'));
             case 'Low':
-                return 'check';
+                return new vscode.ThemeIcon('check', new vscode.ThemeColor('charts.green'));
             default:
-                return 'symbol-variable';
+                return new vscode.ThemeIcon('symbol-variable');
         }
     }
 }

@@ -120,7 +120,7 @@ export class AnalysisEngine {
 
     // Analyze files
     for (const file of filesToAnalyze) {
-      await this.analyzeFile(file.path, file.content, file.extension);
+      await this.analyzeFile(file.relativePath, file.content, file.extension);
     }
 
     // Run unused detection
@@ -177,8 +177,12 @@ export class AnalysisEngine {
   }
 
   private async analyzeFile(filePath: string, content: string, extension: string): Promise<void> {
-    // Try all analyzers
+    // Try all compatible analyzers
     for (const analyzer of this.analyzers) {
+      if (!analyzer.supportedExtensions.includes(extension)) {
+        continue;
+      }
+
       try {
         // Create analysis context
         const context = {
@@ -225,7 +229,7 @@ export class AnalysisEngine {
           );
         }
 
-        break; // Use first matching analyzer
+        // Removed break to allow multiple analyzers (e.g., TS + Endpoint)
       } catch (error) {
         if (this.debug) {
           console.warn(`[Engine] Analyzer ${analyzer.name} failed for ${filePath}:`, error);

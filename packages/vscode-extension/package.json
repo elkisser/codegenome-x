@@ -3,7 +3,11 @@
   "displayName": "CodeGenome X",
   "description": "Professional structural analysis engine for VS Code",
   "version": "1.0.0",
-  "publisher": "codegenome-x",
+  "publisher": "CodeGenomeX",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/codegenome-x/vscode-extension"
+  },
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -23,6 +27,7 @@
   ],
   "main": "./dist/extension.js",
   "activationEvents": [
+    "onStartupFinished",
     "onCommand:codegenome.analyze",
     "onView:codegenomeExplorer"
   ],
@@ -93,33 +98,47 @@
         },
         "codegenome.includePatterns": {
           "type": "array",
-          "default": ["**/*.{ts,tsx,js,jsx,php}"],
+          "default": [
+            "**/*.{ts,tsx,js,jsx,php}"
+          ],
           "description": "File patterns to include in analysis"
         },
         "codegenome.excludePatterns": {
           "type": "array",
-          "default": ["node_modules/**", "dist/**", "build/**", ".git/**"],
+          "default": [
+            "node_modules/**",
+            "dist/**",
+            "build/**",
+            ".git/**"
+          ],
           "description": "File patterns to exclude from analysis"
         }
       }
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run build",
-    "build": "tsc -p ./",
-    "dev": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run package",
+    "package": "node esbuild.js --production",
+    "build": "node esbuild.js",
+    "dev": "node esbuild.js --watch",
     "test": "jest",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
-  "dependencies": {
-    "@codegenome-x/core": "workspace:*",
-    "vscode": "^1.1.37"
-  },
   "devDependencies": {
-    "@types/vscode": "^1.74.0",
+    "@codegenome-x/core": "file:../core",
     "@types/node": "^20.0.0",
-    "@vscode/vsce": "^2.19.0"
+    "@types/vscode": "^1.74.0",
+    "@vscode/vsce": "^2.19.0",
+    "esbuild": "^0.25.12",
+    "glob": "^10.5.0"
+  },
+  "dependencies": {
+    "@typescript-eslint/parser": "^8.56.0",
+    "@typescript-eslint/typescript-estree": "^6.0.0",
+    "hash-wasm": "^4.12.0",
+    "minimatch": "^10.2.2",
+    "typescript": "^5.9.3"
   }
 }
